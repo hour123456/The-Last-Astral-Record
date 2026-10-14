@@ -31,4 +31,16 @@ assert len(imgs) == 14, f"Expected 14 images, got {len(imgs)}"
 assert len(bgms) == 6, f"Expected 6 BGMs, got {len(bgms)}"
 assert len(sfxs) == 9, f"Expected 9 SFXs, got {len(sfxs)}"
 assert len(missing) == 0, f"Missing targets: {missing}"
-print("ALL INTEGRITY CHECKS PASSED 100%!")
+
+html = open(os.path.join(base, "index.html"), encoding="utf-8").read()
+engine = open(os.path.join(base, "js", "engine.js"), encoding="utf-8").read()
+css = open(os.path.join(base, "css", "style.css"), encoding="utf-8").read()
+html_ids = set(re.findall(r'id="([^"]+)"', html))
+engine_ids = set(re.findall(r'getElementById\("([^"]+)"\)', engine))
+missing_dom = engine_ids - html_ids
+print(f"HTML IDs: {len(html_ids)}, Engine DOM refs: {len(engine_ids)}, Missing DOM IDs: {missing_dom}")
+assert len(missing_dom) == 0, f"Missing DOM IDs: {missing_dom}"
+assert "@media (max-width: 1024px)" in css
+assert "@media (max-width: 768px)" in css
+assert "@media (max-height: 540px) and (orientation: landscape)" in css
+print("ALL INTEGRITY & MOBILE/TABLET CHECKS PASSED 100%!")
