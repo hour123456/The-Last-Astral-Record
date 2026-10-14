@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>창백한 별의 레퀴엠 : 제0시계탑의 관측자 — CHRONOS-ARIA</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="game-viewport">
+    <!-- Background Layer -->
+    <div id="bg-layer" style="background-image: url('assets/images/bg_title_clocktower.png');"></div>
+    <div id="bg-next-layer"></div>
+
+    <!-- Character Stage (Left / Center / Right) -->
+    <div id="char-stage">
+      <div id="slot-left" class="char-slot"></div>
+      <div id="slot-center" class="char-slot center-slot"></div>
+      <div id="slot-right" class="char-slot"></div>
+    </div>
+
+    <!-- Real-Time 60FPS Weather & Directing FX Canvases -->
+    <canvas id="weather-canvas"></canvas>
+    <div id="vignette-layer"></div>
+    <canvas id="fx-canvas"></canvas>
+    <div id="flash-overlay"></div>
+
+    <!-- Top Chronos HUD Bar -->
+    <header id="chronos-hud">
+      <div class="hud-group">
+        <div class="divergence-box" title="현재 세계선 편차율 (1.048596% 돌파 시 여명 세계선 도달)">
+          <span class="divergence-label">DIVERGENCE</span>
+          <span id="hud-divergence">0.041829%</span>
+        </div>
+        <span id="hud-location">성도 에텔가르드 · 상공 관측역</span>
+      </div>
+
+      <div class="hud-group">
+        <div class="resonance-pills">
+          <span id="res-celestia" class="res-pill celestia">셀레스티아 공명 50%</span>
+          <span id="res-isolde" class="res-pill isolde">이졸데 인연 50%</span>
+        </div>
+        <div id="hud-countdown" class="countdown-box" title="종말백야(영원정지)까지 남은 시간">
+          D-72:00:00
+        </div>
+      </div>
+    </header>
+
+    <!-- NVL Full-Screen Literary Novel Mode Overlay -->
+    <section id="nvl-container">
+      <div class="nvl-paper">
+        <div id="nvl-text"></div>
+        <div id="ending-badge-banner" style="display:none;"></div>
+      </div>
+    </section>
+
+    <!-- ADV Classic Bottom Dialogue Frame -->
+    <section id="adv-container">
+      <div id="speaker-plate" style="display:none;">
+        <span id="speaker-name">카일런</span>
+        <span id="speaker-title">제0시계탑의 최후 관측자</span>
+      </div>
+      <div id="adv-text"></div>
+      <div id="next-indicator">
+        <span>NEXT</span>
+        <span>⌚</span>
+      </div>
+    </section>
+
+    <!-- Quick Action Bar -->
+    <nav id="quick-bar">
+      <button id="btn-nvl" class="q-btn" title="단축키 V : ADV / NVL 소설 모드 전환">NVL/ADV 전환 (V)</button>
+      <button id="btn-auto" class="q-btn" title="단축키 A : 자동 진행">자동진행 (A)</button>
+      <button id="btn-skip" class="q-btn" title="단축키 S : 고속 스킵">스킵 (S)</button>
+      <button id="btn-log" class="q-btn" title="단축키 L : 지난 대사 회상록">회상록 (L)</button>
+      <button id="btn-codex" class="q-btn" title="단축키 C : 세계관 백과사전">백과사전 (C)</button>
+      <button id="btn-flow" class="q-btn" title="세계선 챕터 도약">세계선 차트</button>
+      <button id="btn-qsave" class="q-btn" title="단축키 F5 : 슬롯 1 즉시 저장">Q.SAVE (F5)</button>
+      <button id="btn-qload" class="q-btn" title="단축키 F8 : 슬롯 1 즉시 불러오기">Q.LOAD (F8)</button>
+      <button id="btn-save" class="q-btn">저장</button>
+      <button id="btn-load" class="q-btn">불러오기</button>
+      <button id="btn-title" class="q-btn">타이틀로</button>
+    </nav>
+
+    <!-- Interactive Branching Choice Overlay -->
+    <section id="choice-overlay">
+      <div class="choice-header">❖ LAPLACE WORLDLINE OBSERVATION CHOICE ❖</div>
+      <div id="choice-list" style="display:flex; flex-direction:column; gap:14px; align-items:center;"></div>
+    </section>
+
+    <!-- Cinematic Chapter Title Card -->
+    <section id="chapter-card">
+      <div class="chap-ornament">─── ❖ ───</div>
+      <h1 id="chap-main-title">프롤로그 : 백색 낙하의 밤</h1>
+      <p id="chap-sub-title">THE NIGHT OF THE WHITE FALL</p>
+    </section>
+
+    <!-- Title Screen -->
+    <section id="title-screen">
+      <div class="title-left">
+        <div class="title-emblem">CHRONOS-ARIA ENGINE · ORIGINAL AAA LIGHT NOVEL</div>
+        <h1 class="title-main">창백한 별의 레퀴엠</h1>
+        <p class="title-sub">제0시계탑의 관측자 — The Last Astral Record</p>
+
+        <div class="title-menu">
+          <button id="t-start" class="t-btn">
+            <span>새로운 관측 시작</span>
+            <span class="en">NEW GAME</span>
+          </button>
+          <button id="t-load" class="t-btn">
+            <span>관측 기록 복원</span>
+            <span class="en">CONTINUE</span>
+          </button>
+          <button id="t-flow" class="t-btn">
+            <span>세계선 챕터 선택</span>
+            <span class="en">FLOWCHART</span>
+          </button>
+          <button id="t-codex" class="t-btn">
+            <span>제0시계탑 대서고 (백과사전)</span>
+            <span class="en">CODEX</span>
+          </button>
+          <button id="t-gallery" class="t-btn">
+            <span>화상 기록실 (CG 갤러리)</span>
+            <span class="en">GALLERY</span>
+          </button>
+          <button id="t-music" class="t-btn">
+            <span>백야당 축음기 (OST 음악실)</span>
+            <span class="en">JUKEBOX</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Title Screen Heroine Key Visual Showcase -->
+      <div style="height:94vh; display:flex; align-items:flex-end; pointer-events:none;">
+        <img src="assets/images/char_celestia_normal.png" alt="Celestia Astraea" style="max-height:92vh; filter: drop-shadow(0 0 35px rgba(125,211,252,0.35));" />
+      </div>
+    </section>
+
+    <!-- Universal Modal Window (Codex / Gallery / OST / Save / Load / Backlog / Flowchart) -->
+    <section id="modal-backdrop" class="modal-backdrop">
+      <div class="modal-header">
+        <h2 id="modal-title" class="modal-title">ARCHIVES</h2>
+        <button id="modal-close-btn" class="modal-close">닫기 (ESC)</button>
+      </div>
+      <div id="modal-body" class="modal-body"></div>
+    </section>
+
+    <!-- Toast Notifications -->
+    <div id="toast-box"></div>
+  </div>
+
+  <!-- Game Data & Story Modules -->
+  <script src="js/lore_data.js"></script>
+  <script src="js/story_act1.js"></script>
+  <script src="js/story_interlude.js"></script>
+  <script src="js/story_act2.js"></script>
+  <script src="js/story_flashback.js"></script>
+  <script src="js/story_act3.js"></script>
+  <script src="js/engine.js"></script>
+</body>
+</html>
