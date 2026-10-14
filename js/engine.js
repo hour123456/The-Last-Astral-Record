@@ -41,8 +41,11 @@ class ChronosAriaEngine {
     this.skipMode = false;
     this.autoTimer = null;
     this.currentBgmKey = null;
+    this.isMuted = localStorage.getItem("chronos_muted") === "1";
+    this.activeSfx = new Set();
     this.bgmAudio = new Audio();
     this.bgmAudio.loop = true;
+    this.bgmAudio.muted = this.isMuted;
     this.bgmVolume = 0.65;
     this.sfxVolume = 0.80;
     this.audioCtx = null;
@@ -58,6 +61,7 @@ class ChronosAriaEngine {
     this.initCanvases();
     this.bindEvents();
     this.loadPersistentUnlocks();
+    this.updateQuickButtons();
   }
 
   initDOM() {
@@ -123,13 +127,37 @@ class ChronosAriaEngine {
         this.audioCtx = new AudioContextClass();
       }
     }
-    if (this.audioCtx && this.audioCtx.state === "suspended") {
+    if (this.audioCtx && this.audioCtx.state === "suspended" && !this.isMuted) {
       this.audioCtx.resume();
     }
   }
 
+  toggleMute() {
+    this.isMuted = !this.isMuted;
+    try {
+      localStorage.setItem("chronos_muted", this.isMuted ? "1" : "0");
+    } catch (e) {}
+
+    this.bgmAudio.muted = this.isMuted;
+    this.activeSfx.forEach(sfx => {
+      sfx.muted = this.isMuted;
+    });
+
+    if (!this.isMuted) {
+      this.ensureAudioContext();
+      if (this.currentBgmKey && this.bgmAudio.paused) {
+        this.bgmAudio.play().catch(() => {});
+      }
+      this.showToast("🔊 음소거가 해제되었습니다.");
+    } else {
+      this.showToast("🔇 전체 음소거가 설정되었습니다.");
+    }
+
+    this.updateQuickButtons();
+  }
+
   playVoiceBlip(speakerName) {
-    if (!this.audioCtx || this.skipMode) return;
+    if (!this.audioCtx || this.skipMode || this.isMuted) return;
     try {
       const now = this.audioCtx.currentTime;
       const osc = this.audioCtx.createOscillator();
@@ -159,14 +187,20 @@ class ChronosAriaEngine {
     this.currentBgmKey = bgmKey;
     this.bgmAudio.src = track.file;
     this.bgmAudio.volume = this.bgmVolume;
+    this.bgmAudio.muted = this.isMuted;
     this.bgmAudio.play().catch(() => {});
   }
 
   playSFX(sfxName) {
-    if (!sfxName) return;
+    if (!sfxName || this.isMuted) return;
     const sfx = new Audio(`assets/sfx/${sfxName}.wav`);
     sfx.volume = this.sfxVolume;
-    sfx.play().catch(() => {});
+    sfx.muted = this.isMuted;
+    this.activeSfx.add(sfx);
+    sfx.addEventListener("ended", () => this.activeSfx.delete(sfx));
+    sfx.play().catch(() => {
+      this.activeSfx.delete(sfx);
+    });
   }
 
   showToast(msg) {
@@ -1000,13 +1034,31 @@ class ChronosAriaEngine {
     document.getElementById("btn-auto").classList.toggle("active", this.autoMode);
     document.getElementById("btn-skip").classList.toggle("active", this.skipMode);
     document.getElementById("btn-nvl").classList.toggle("active", this.forceNVL);
+
+    const btnMute = document.getElementById("btn-mute");
+    if (btnMute) {
+      btnMute.classList.toggle("active", this.isMuted);
+      btnMute.innerHTML = this.isMuted
+        ? `🔇 음소거 해제<span class="kb-hint"> (M)</span>`
+        : `🔊 음소거<span class="kb-hint"> (M)</span>`;
+    }
+    const btnHudMute = document.getElementById("btn-hud-mute");
+    if (btnHudMute) {
+      btnHudMute.classList.toggle("muted", this.isMuted);
+      btnHudMute.textContent = this.isMuted ? "🔇" : "🔊";
+    }
+    const btnTitleMute = document.getElementById("btn-title-mute");
+    if (btnTitleMute) {
+      btnTitleMute.classList.toggle("muted", this.isMuted);
+      btnTitleMute.textContent = this.isMuted ? "🔇 음소거됨" : "🔊 음향 ON";
+    }
   }
 
   bindEvents() {
     // Unlock iOS / iPadOS / Android WebAudio & HTML5 Audio on first touch
     const unlockMobileAudio = () => {
       this.ensureAudioContext();
-      if (this.currentBgmKey && this.bgmAudio.paused) {
+      if (this.currentBgmKey && this.bgmAudio.paused && !this.isMuted) {
         this.bgmAudio.play().catch(() => {});
       }
     };
@@ -1082,6 +1134,11 @@ class ChronosAriaEngine {
 
     // Keyboard shortcuts
     window.addEventListener("keydown", (e) => {
+      if (e.key.toLowerCase() === "m") {
+        e.preventDefault();
+        this.toggleMute();
+        return;
+      }
       if (lb && lb.classList.contains("active")) {
         if (e.key === "Escape") this.closeLightbox();
         return;
@@ -1125,6 +1182,29 @@ class ChronosAriaEngine {
         this.loadSlot(1);
       }
     });
+
+    // Mute Buttons (Quick Bar, Top HUD, Title Screen)
+    const btnMute = document.getElementById("btn-mute");
+    if (btnMute) {
+      btnMute.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.toggleMute();
+      });
+    }
+    const btnHudMute = document.getElementById("btn-hud-mute");
+    if (btnHudMute) {
+      btnHudMute.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.toggleMute();
+      });
+    }
+    const btnTitleMute = document.getElementById("btn-title-mute");
+    if (btnTitleMute) {
+      btnTitleMute.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.toggleMute();
+      });
+    }
 
     // Quick Bar Buttons
     document.getElementById("btn-nvl").addEventListener("click", (e) => {
