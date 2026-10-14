@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#05070e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="창백한 별의 레퀴엠" />
+  <meta name="format-detection" content="telephone=no" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="assets/images/char_celestia_normal.png" />
+  <title>창백한 별의 레퀴엠 : 제0시계탑의 관측자 — CHRONOS-ARIA</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="game-viewport">
+    <!-- Background Layer -->
+    <div id="bg-layer" style="background-image: url('assets/images/bg_title_clocktower.png');"></div>
+    <div id="bg-next-layer"></div>
+
+    <!-- Character Stage (Left / Center / Right) -->
+    <div id="char-stage">
+      <div id="slot-left" class="char-slot"></div>
+      <div id="slot-center" class="char-slot center-slot"></div>
+      <div id="slot-right" class="char-slot"></div>
+    </div>
+
+    <!-- Real-Time 60FPS Weather & Directing FX Canvases -->
+    <canvas id="weather-canvas"></canvas>
+    <div id="vignette-layer"></div>
+    <canvas id="fx-canvas"></canvas>
+    <div id="flash-overlay"></div>
+
+    <!-- Top Chronos HUD Bar -->
+    <header id="chronos-hud">
+      <div class="hud-group hud-left">
+        <div class="divergence-box" title="현재 세계선 편차율 (1.048596% 돌파 시 여명 세계선 도달)">
+          <span class="divergence-label">DIVERGENCE</span>
+          <span id="hud-divergence">0.041829%</span>
+        </div>
+        <span id="hud-location">성도 에텔가르드 · 상공 관측역</span>
+      </div>
+
+      <div class="hud-group hud-right">
+        <div class="resonance-pills">
+          <span id="res-celestia" class="res-pill celestia">셀레스티아 공명 50%</span>
+          <span id="res-isolde" class="res-pill isolde">이졸데 인연 50%</span>
+        </div>
+        <div id="hud-countdown" class="countdown-box" title="종말백야(영원정지)까지 남은 시간">
+          D-72:00:00
+        </div>
+        <button id="btn-hud-mute" class="hud-mute-btn" title="단축키 M : 전체 음소거 / 해제" aria-label="음소거 전환">🔊</button>
+      </div>
+    </header>
+
+    <!-- NVL Full-Screen Literary Novel Mode Overlay -->
+    <section id="nvl-container">
+      <div class="nvl-paper">
+        <div id="nvl-text"></div>
+        <div id="ending-badge-banner" style="display:none;"></div>
+      </div>
+    </section>
+
+    <!-- ADV Classic Bottom Dialogue Frame -->
+    <section id="adv-container">
+      <div id="speaker-plate" style="display:none;">
+        <span id="speaker-name">카일런</span>
+        <span id="speaker-title">제0시계탑의 최후 관측자</span>
+      </div>
+      <div id="adv-text"></div>
+      <div id="next-indicator">
+        <span>NEXT</span>
+        <span>⌚</span>
+      </div>
+    </section>
+
+    <!-- Quick Action Bar -->
+    <nav id="quick-bar" aria-label="빠른 제어 메뉴">
+      <button id="btn-mute" class="q-btn" title="단축키 M : 전체 음소거 / 해제">🔊 음소거<span class="kb-hint"> (M)</span></button>
+      <button id="btn-nvl" class="q-btn" title="단축키 V : ADV / NVL 소설 모드 전환">NVL/ADV<span class="kb-hint"> (V)</span></button>
+      <button id="btn-auto" class="q-btn" title="단축키 A : 자동 진행">자동진행<span class="kb-hint"> (A)</span></button>
+      <button id="btn-skip" class="q-btn" title="단축키 S : 고속 스킵">스킵<span class="kb-hint"> (S)</span></button>
+      <button id="btn-log" class="q-btn" title="단축키 L : 지난 대사 회상록">회상록<span class="kb-hint"> (L)</span></button>
+      <button id="btn-codex" class="q-btn" title="단축키 C : 세계관 백과사전">백과사전<span class="kb-hint"> (C)</span></button>
+      <button id="btn-flow" class="q-btn" title="세계선 챕터 도약">세계선 차트</button>
+      <button id="btn-qsave" class="q-btn" title="단축키 F5 : 슬롯 1 즉시 저장">Q.SAVE<span class="kb-hint"> (F5)</span></button>
+      <button id="btn-qload" class="q-btn" title="단축키 F8 : 슬롯 1 즉시 불러오기">Q.LOAD<span class="kb-hint"> (F8)</span></button>
+      <button id="btn-save" class="q-btn">저장</button>
+      <button id="btn-load" class="q-btn">불러오기</button>
+      <button id="btn-hide-ui" class="q-btn" title="일러스트 감상을 위해 UI 숨기기">UI숨김</button>
+      <button id="btn-fullscreen" class="q-btn" title="전체화면 전환">전체화면</button>
+      <button id="btn-title" class="q-btn">타이틀로</button>
+    </nav>
+
+    <!-- Interactive Branching Choice Overlay -->
+    <section id="choice-overlay">
+      <div class="choice-header">❖ LAPLACE WORLDLINE OBSERVATION CHOICE ❖</div>
+      <div id="choice-list" class="choice-list"></div>
+    </section>
+
+    <!-- Cinematic Chapter Title Card -->
+    <section id="chapter-card">
+      <div class="chap-ornament">─── ❖ ───</div>
+      <h1 id="chap-main-title">프롤로그 : 백색 낙하의 밤</h1>
+      <p id="chap-sub-title">THE NIGHT OF THE WHITE FALL</p>
+    </section>
+
+    <!-- Title Screen -->
+    <section id="title-screen">
+      <button id="btn-title-mute" class="title-mute-btn" title="단축키 M : 전체 음소거 / 해제">🔊 음향 ON</button>
+      <div class="title-left">
+        <div class="title-emblem">CHRONOS-ARIA ENGINE · ORIGINAL AAA LIGHT NOVEL</div>
+        <h1 class="title-main">창백한 별의 레퀴엠</h1>
+        <p class="title-sub">제0시계탑의 관측자 — The Last Astral Record</p>
+
+        <div class="title-menu">
+          <button id="t-start" class="t-btn">
+            <span>새로운 관측 시작</span>
+            <span class="en">NEW GAME</span>
+          </button>
+          <button id="t-load" class="t-btn">
+            <span>관측 기록 복원</span>
+            <span class="en">CONTINUE</span>
+          </button>
+          <button id="t-flow" class="t-btn">
+            <span>세계선 챕터 선택</span>
+            <span class="en">FLOWCHART</span>
+          </button>
+          <button id="t-codex" class="t-btn">
+            <span>제0시계탑 대서고 (백과사전)</span>
+            <span class="en">CODEX</span>
+          </button>
+          <button id="t-gallery" class="t-btn">
+            <span>화상 기록실 (CG 갤러리)</span>
+            <span class="en">GALLERY</span>
+          </button>
+          <button id="t-music" class="t-btn">
+            <span>백야당 축음기 (OST 음악실)</span>
+            <span class="en">JUKEBOX</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Title Screen Heroine Key Visual Showcase -->
+      <div class="title-heroine-wrap">
+        <img src="assets/images/char_celestia_normal.png" alt="Celestia Astraea" class="title-heroine-img" />
+      </div>
+    </section>
+
+    <!-- Universal Modal Window (Codex / Gallery / OST / Save / Load / Backlog / Flowchart) -->
+    <section id="modal-backdrop" class="modal-backdrop">
+      <div class="modal-header">
+        <h2 id="modal-title" class="modal-title">ARCHIVES</h2>
+        <button id="modal-close-btn" class="modal-close">닫기 (ESC)</button>
+      </div>
+      <div id="modal-body" class="modal-body"></div>
+    </section>
+
+    <!-- In-App Fullscreen CG Lightbox Viewer (Mobile/Tablet Friendly) -->
+    <section id="cg-lightbox" class="cg-lightbox">
+      <img id="cg-lightbox-img" src="" alt="CG Fullscreen View" />
+      <div id="cg-lightbox-caption" class="cg-lightbox-caption"></div>
+      <button id="cg-lightbox-close" class="modal-close cg-lightbox-close">닫기 ✕</button>
+    </section>
+
+    <!-- Toast Notifications -->
+    <div id="toast-box"></div>
+  </div>
+
+  <!-- Game Data & Story Modules -->
+  <script src="js/lore_data.js"></script>
+  <script src="js/story_act1.js"></script>
+  <script src="js/story_interlude.js"></script>
+  <script src="js/story_act2.js"></script>
+  <script src="js/story_flashback.js"></script>
+  <script src="js/story_act3.js"></script>
+  <script src="js/engine.js"></script>
+</body>
+</html>
