@@ -554,14 +554,24 @@ class ChronosAriaEngine {
     this.fxCanvas = document.getElementById("fx-canvas");
     this.fxCtx = this.fxCanvas.getContext("2d");
 
-    const resize = () => {
-      this.wCanvas.width = window.innerWidth;
-      this.wCanvas.height = window.innerHeight;
-      this.fxCanvas.width = window.innerWidth;
-      this.fxCanvas.height = window.innerHeight;
+    const syncViewportAndCanvases = () => {
+      const vw = window.visualViewport ? window.visualViewport.width : window.innerWidth;
+      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      document.documentElement.style.setProperty("--app-height", `${vh}px`);
+      this.wCanvas.width = vw;
+      this.wCanvas.height = vh;
+      this.fxCanvas.width = vw;
+      this.fxCanvas.height = vh;
     };
-    window.addEventListener("resize", resize);
-    resize();
+
+    window.addEventListener("resize", syncViewportAndCanvases);
+    window.addEventListener("orientationchange", () => {
+      setTimeout(syncViewportAndCanvases, 120);
+    });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", syncViewportAndCanvases);
+    }
+    syncViewportAndCanvases();
 
     for (let i = 0; i < 110; i++) {
       this.particles.push({
@@ -801,7 +811,7 @@ class ChronosAriaEngine {
         <div class="info-card" style="cursor:pointer;" data-slot="${i}">
           <span class="badge">CHRONOS SLOT 0${i}</span>
           <h3>${info ? info.location : "비어 있는 관측 슬롯"}</h3>
-          <p>${info ? `편차율: ${info.divergence.toFixed(6)}% | ${info.countdown}<br><small>${info.timestamp}</small>` : "클릭하여 이 슬롯을 선택하세요."}</p>
+          <p>${info ? `편차율: ${info.divergence.toFixed(6)}% | ${info.countdown}<br><small>${info.timestamp}</small>` : "터치/클릭하여 이 슬롯을 선택하세요."}</p>
         </div>
       `;
     }
@@ -841,14 +851,29 @@ class ChronosAriaEngine {
     this.elModal.classList.add("active");
   }
 
+  openLightbox(fileUrl, captionText) {
+    const lb = document.getElementById("cg-lightbox");
+    const img = document.getElementById("cg-lightbox-img");
+    const cap = document.getElementById("cg-lightbox-caption");
+    if (!lb || !img) return;
+    img.src = fileUrl;
+    if (cap) cap.textContent = captionText || "";
+    lb.classList.add("active");
+  }
+
+  closeLightbox() {
+    const lb = document.getElementById("cg-lightbox");
+    if (lb) lb.classList.remove("active");
+  }
+
   openGalleryModal() {
     this.playSFX("sfx_page_turn");
     this.elModalTitle.textContent = "화상 기록실 (VISUAL ART & EVENT CG GALLERY)";
     let html = `<div class="grid-cards">`;
-    window.GAME_METADATA.cgList.forEach(cg => {
+    window.GAME_METADATA.cgList.forEach((cg, idx) => {
       html += `
-        <div class="info-card">
-          <img class="cg-thumb" src="${cg.file}" alt="${cg.title}" onclick="window.open('${cg.file}', '_blank')" />
+        <div class="info-card cg-card-item" data-cg-idx="${idx}" style="cursor:pointer;">
+          <img class="cg-thumb" src="${cg.file}" alt="${cg.title}" />
           <span class="badge">${cg.subtitle}</span>
           <h3>${cg.title}</h3>
           <p>${cg.quote}</p>
@@ -857,6 +882,12 @@ class ChronosAriaEngine {
     });
     html += `</div>`;
     this.elModalBody.innerHTML = html;
+    this.elModalBody.querySelectorAll(".cg-card-item").forEach(card => {
+      card.addEventListener("click", () => {
+        const cg = window.GAME_METADATA.cgList[parseInt(card.dataset.cgIdx, 10)];
+        if (cg) this.openLightbox(cg.file, `${cg.title} — ${cg.quote}`);
+      });
+    });
     this.elModal.classList.add("active");
   }
 
@@ -881,6 +912,7 @@ class ChronosAriaEngine {
     this.elModalBody.innerHTML = html;
     this.elModalBody.querySelectorAll(".ost-play-btn").forEach(btn => {
       btn.addEventListener("click", () => {
+        this.ensureAudioContext();
         this.currentBgmKey = null;
         this.playBGM(btn.dataset.bgm);
         this.openMusicModal();
@@ -946,6 +978,24 @@ class ChronosAriaEngine {
     this.elModal.classList.remove("active");
   }
 
+  toggleFullscreen() {
+    const doc = document;
+    const el = document.documentElement;
+    const isFs = doc.fullscreenElement || doc.webkitFullscreenElement;
+    if (!isFs) {
+      if (el.requestFullscreen) {
+        el.requestFullscreen().catch(() => {});
+      } else if (el.webkitRequestFullscreen) {
+        el.webkitRequestFullscreen();
+      } else {
+        this.showToast("📱 iOS에서는 공유 버튼 → 『홈 화면에 추가』로 전체화면 앱 실행이 가능합니다.");
+      }
+    } else {
+      if (doc.exitFullscreen) doc.exitFullscreen().catch(() => {});
+      else if (doc.webkitExitFullscreen) doc.webkitExitFullscreen();
+    }
+  }
+
   updateQuickButtons() {
     document.getElementById("btn-auto").classList.toggle("active", this.autoMode);
     document.getElementById("btn-skip").classList.toggle("active", this.skipMode);
@@ -953,15 +1003,89 @@ class ChronosAriaEngine {
   }
 
   bindEvents() {
-    // Advance on stage click
-    document.getElementById("adv-container").addEventListener("click", () => this.advance());
-    document.getElementById("nvl-container").addEventListener("click", () => this.advance());
-    document.getElementById("chapter-card").addEventListener("click", () => {
+    // Unlock iOS / iPadOS / Android WebAudio & HTML5 Audio on first touch
+    const unlockMobileAudio = () => {
+      this.ensureAudioContext();
+      if (this.currentBgmKey && this.bgmAudio.paused) {
+        this.bgmAudio.play().catch(() => {});
+      }
+    };
+    window.addEventListener("touchstart", unlockMobileAudio, { passive: true, once: true });
+    window.addEventListener("pointerdown", unlockMobileAudio, { passive: true, once: true });
+
+    // Advance on dialogue or background stage tap
+    document.getElementById("adv-container").addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (this.elViewport.classList.contains("ui-hidden")) {
+        this.elViewport.classList.remove("ui-hidden");
+        return;
+      }
+      this.advance();
+    });
+    document.getElementById("nvl-container").addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (this.elViewport.classList.contains("ui-hidden")) {
+        this.elViewport.classList.remove("ui-hidden");
+        return;
+      }
+      this.advance();
+    });
+    this.elViewport.addEventListener("click", (e) => {
+      if (this.elViewport.classList.contains("ui-hidden")) {
+        this.elViewport.classList.remove("ui-hidden");
+        return;
+      }
+      if (!this.elTitleScreen.classList.contains("hidden")) return;
+      if (this.elModal.classList.contains("active")) return;
+      if (this.elChoiceOverlay.classList.contains("active")) return;
+      if (e.target.closest("#quick-bar") || e.target.closest("#chronos-hud")) return;
+      this.advance();
+    });
+
+    document.getElementById("chapter-card").addEventListener("click", (e) => {
+      e.stopPropagation();
       this.elChapterCard.classList.remove("active");
     });
 
+    // Lightbox close events
+    const lb = document.getElementById("cg-lightbox");
+    const lbClose = document.getElementById("cg-lightbox-close");
+    if (lb) lb.addEventListener("click", () => this.closeLightbox());
+    if (lbClose) lbClose.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.closeLightbox();
+    });
+
+    // Mobile Swipe Gestures (Swipe Up -> Backlog, Two-Finger Tap -> Hide UI)
+    let touchStartY = 0;
+    let touchStartX = 0;
+    this.elViewport.addEventListener("touchstart", (e) => {
+      if (e.touches.length === 2 && this.elTitleScreen.classList.contains("hidden")) {
+        this.elViewport.classList.toggle("ui-hidden");
+      } else if (e.touches.length === 1) {
+        touchStartY = e.touches[0].clientY;
+        touchStartX = e.touches[0].clientX;
+      }
+    }, { passive: true });
+
+    this.elViewport.addEventListener("touchend", (e) => {
+      if (!this.elTitleScreen.classList.contains("hidden") || this.elModal.classList.contains("active")) return;
+      if (e.changedTouches.length === 1) {
+        const dy = touchStartY - e.changedTouches[0].clientY;
+        const dx = Math.abs(touchStartX - e.changedTouches[0].clientX);
+        // Swipe Up to open Backlog (only if not scrolling inside text/quick-bar)
+        if (dy > 85 && dx < 60 && !e.target.closest("#quick-bar") && !e.target.closest(".nvl-paper")) {
+          this.openBacklogModal();
+        }
+      }
+    }, { passive: true });
+
     // Keyboard shortcuts
     window.addEventListener("keydown", (e) => {
+      if (lb && lb.classList.contains("active")) {
+        if (e.key === "Escape") this.closeLightbox();
+        return;
+      }
       if (this.elModal.classList.contains("active")) {
         if (e.key === "Escape") this.closeModal();
         return;
@@ -970,7 +1094,11 @@ class ChronosAriaEngine {
 
       if (e.key === " " || e.key === "Enter") {
         e.preventDefault();
-        this.advance();
+        if (this.elViewport.classList.contains("ui-hidden")) {
+          this.elViewport.classList.remove("ui-hidden");
+        } else {
+          this.advance();
+        }
       } else if (e.key.toLowerCase() === "v") {
         this.forceNVL = !this.forceNVL;
         this.updateQuickButtons();
@@ -987,6 +1115,8 @@ class ChronosAriaEngine {
         this.openBacklogModal();
       } else if (e.key.toLowerCase() === "c") {
         this.openCodexModal();
+      } else if (e.key.toLowerCase() === "h") {
+        this.elViewport.classList.toggle("ui-hidden");
       } else if (e.key === "F5") {
         e.preventDefault();
         this.saveSlot(1);
@@ -1045,6 +1175,21 @@ class ChronosAriaEngine {
       e.stopPropagation();
       this.openFlowchartModal();
     });
+    const btnHideUi = document.getElementById("btn-hide-ui");
+    if (btnHideUi) {
+      btnHideUi.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.elViewport.classList.add("ui-hidden");
+        this.showToast("🖼️ 화면을 터치하면 UI가 다시 표시됩니다.");
+      });
+    }
+    const btnFs = document.getElementById("btn-fullscreen");
+    if (btnFs) {
+      btnFs.addEventListener("click", (e) => {
+        e.stopPropagation();
+        this.toggleFullscreen();
+      });
+    }
     document.getElementById("btn-title").addEventListener("click", (e) => {
       e.stopPropagation();
       this.autoMode = false;
