@@ -1,0 +1,17 @@
+{
+  "name": "창백한 별의 레퀴엠 : 제0시계탑의 관측자",
+  "short_name": "창백한 별의 레퀴엠",
+  "description": "CHRONOS-ARIA : 제0시계탑의 관측자 — AAA 오리지널 라이트 노벨 게임",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "any",
+  "background_color": "#05070e",
+  "theme_color": "#05070e",
+  "icons": [
+    {
+      "src": "assets/images/char_celestia_normal.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
